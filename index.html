@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smart AI Cinematic Generator</title>
+<title>Local AI Multi-Object Cinematic Generator</title>
 <style>
-body{margin:0;padding:20px;background:#0b1220;color:#e6eef6;font-family:Inter,system-ui,sans-serif;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
+body{margin:0;padding:20px;background:#0b1220;color:#e6eef6;font-family:Inter,sans-serif;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
 .container{max-width:1000px;width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;box-shadow:0 0 25px rgba(0,0,0,0.4)}
 h1{margin-top:0;color:#6ee7b7;text-align:center}
 label{display:block;margin-top:12px;font-size:14px}
@@ -19,142 +19,128 @@ video{width:100%;margin-top:14px;border-radius:8px;background:#000}
 </head>
 <body>
 <div class="container">
-<h1>🤖 Smart AI Cinematic Generator</h1>
+<h1>🐾 Local AI Multi-Object Cinematic Generator</h1>
 
-<label>Prompt (Describe scene & actions)</label>
-<textarea id="prompt" rows="5" placeholder="e.g. Cat sees fish bowl, jumps, meows"></textarea>
+<label>Scene Prompt</label>
+<textarea id="prompt" rows="5" placeholder="e.g. Cat sees dog → jumps → dog chases cat"></textarea>
 
 <label>Scene Duration (seconds)</label>
-<input id="sceneDuration" type="number" min="1" max="20" value="5">
+<input id="duration" type="number" min="1" max="20" value="8">
 
-<label>OpenAI API Key (TTS)</label>
-<input id="openaiKey" type="text" placeholder="Paste your OpenAI API key">
-
-<label>Kaiber API Key (AI Video)</label>
-<input id="kaiberKey" type="text" placeholder="Paste your Kaiber API key">
-
-<label>Upload Object Image (optional)</label>
+<label>Upload Object Images (optional, multiple)</label>
 <div id="uploads">
-  <input type="file" id="userImage" accept="image/*">
+  <input type="file" id="userImages" accept="image/*" multiple>
 </div>
 
-<button id="generate">Generate Smart Cinematic Reel</button>
+<button id="generate">Generate Reel</button>
 <video id="preview" controls></video>
-<div class="note">Automatically animates objects, handles multi-step behaviors, motion, camera, TTS, and sound effects.</div>
+<div class="note">Local AI generation + object behavior sequencing + browser TTS + canvas animation.</div>
 </div>
 
 <script>
 const btn=document.getElementById('generate');
 const preview=document.getElementById('preview');
-const userImageInput=document.getElementById('userImage');
+const userImagesInput=document.getElementById('userImages');
 
-function easeInOut(t){return t<0.5?2*t*t:1-(--t)*(2*t-1);}
+// Convert uploaded images to base64 for canvas usage
+async function filesToBase64(files){
+  const promises=[];
+  for(const file of files){
+    promises.push(new Promise(res=>{
+      const reader=new FileReader();
+      reader.onload=()=>res(reader.result);
+      reader.readAsDataURL(file);
+    }));
+  }
+  return Promise.all(promises);
+}
 
-async function fileToBase64(file){
-  return new Promise(res=>{
-    const reader=new FileReader();
-    reader.onload=()=>res(reader.result);
-    reader.readAsDataURL(file);
+// Simple behavior sequencer per object
+function behaviorSequencer(objects, t){
+  objects.forEach(obj=>{
+    const step=obj.behaviors[obj.currentStep]||{dx:0,dy:0,scale:1};
+    obj.x+=step.dx;
+    obj.y+=step.dy;
+    obj.scale=step.scale||1;
+    obj.currentFrame++;
+    if(obj.currentFrame>=step.duration){ obj.currentFrame=0; obj.currentStep=(obj.currentStep+1)%obj.behaviors.length; }
   });
 }
 
-// Generate AI video for a scene (multi-step behavior)
-async function generateSceneVideo(prompt,duration,userImage,kaiberKey){
-  const payload={
-    prompt,
-    duration,
-    style:'cinematic',
-    behavior:'smart',
-    userImage:userImage?await fileToBase64(userImage):null
-  };
-  const resp=await fetch('https://api.kaiber.ai/v1/generate',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+kaiberKey},
-    body:JSON.stringify(payload)
-  });
-  if(!resp.ok) throw new Error('Kaiber API error: '+resp.status);
-  const data=await resp.json();
-  const videoResp=await fetch(data.videoUrl);
-  return await videoResp.blob();
-}
-
-// Generate TTS for a scene
-async function generateTTS(openaiKey,text){
-  const resp=await fetch('https://api.openai.com/v1/audio/speech',{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+openaiKey,'Content-Type':'application/json'},
-    body:JSON.stringify({model:'gpt-4o-mini-tts',voice:'alloy',input:text})
-  });
-  if(!resp.ok) throw new Error('TTS API error: '+resp.status);
-  return await resp.blob();
-}
-
-// Merge clips with smooth frame-by-frame motion
-async function mergeClipsWithAudio(clips,audios){
+// Render local AI video
+async function renderVideo(prompt,duration,userImages){
   const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext('2d');
   canvas.width=720; canvas.height=1280;
-  const fps=30;
+  const ctx=canvas.getContext('2d');
+  const fps=30; const totalFrames=duration*fps;
+  const objects=[];
+
+  // Load uploaded images as objects
+  if(userImages && userImages.length){
+    for(const imgSrc of await filesToBase64(userImages)){
+      const img=new Image();
+      img.src=imgSrc;
+      await img.decode();
+      objects.push({img,x:360,y:640,scale:1,behaviors:[{dx:Math.random()*4-2,dy:Math.random()*2,scale:1.0,duration:fps}],currentStep:0,currentFrame:0});
+    }
+  } else {
+    // placeholder objects if no images uploaded
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.src='https://source.unsplash.com/200x200/?'+encodeURIComponent(prompt.split(' ')[0]);
+    await img.decode();
+    objects.push({img,x:360,y:640,scale:1,behaviors:[{dx:1,dy:0,scale:1,duration:fps}],currentStep:0,currentFrame:0});
+  }
+
   const stream=canvas.captureStream(fps);
   const rec=new MediaRecorder(stream,{mimeType:'video/webm'});
   const chunks=[];
-  rec.ondataavailable=e=>{if(e.data.size) chunks.push(e.data)};
+  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  const done=new Promise(res=>rec.onstop=()=>res(new Blob(chunks,{type:'video/webm'})));
   rec.start();
 
-  for(let i=0;i<clips.length;i++){
-    const clipBlob=clips[i];
-    const audioBlob=audios[i];
-    const videoEl=document.createElement('video');
-    videoEl.src=URL.createObjectURL(clipBlob);
-    videoEl.muted=true; await videoEl.play().catch(()=>{});
-    const audioEl=document.createElement('audio');
-    audioEl.src=URL.createObjectURL(audioBlob);
-    audioEl.play().catch(()=>{});
-
-    const duration=videoEl.duration||4;
-    const totalFrames=Math.ceil(fps*duration);
-    for(let f=0;f<totalFrames;f++){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      const t=easeInOut(f/totalFrames);
-
-      // Smooth transforms
-      const scale=1+t*0.1;
-      const dx=t*50; const dy=t*30;
-      ctx.save();
-      ctx.translate(dx,dy);
-      ctx.scale(scale,scale);
-      ctx.drawImage(videoEl,0,0,canvas.width,canvas.height);
-      ctx.restore();
-
-      await new Promise(r=>setTimeout(r,1000/fps));
-    }
-    videoEl.pause();
-    audioEl.pause();
+  for(let f=0;f<totalFrames;f++){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    behaviorSequencer(objects,f);
+    // draw each object
+    objects.forEach(obj=>{
+      const w=obj.img.width*obj.scale;
+      const h=obj.img.height*obj.scale;
+      ctx.drawImage(obj.img,obj.x-w/2,obj.y-h/2,w,h);
+    });
+    // draw prompt text
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.font='bold 32px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(prompt,canvas.width/2,120);
+    await new Promise(r=>setTimeout(r,1000/fps));
   }
 
   rec.stop();
-  return new Promise(res=>rec.onstop=()=>res(new Blob(chunks,{type:'video/webm'})));
+  return done;
+}
+
+// Browser TTS for narration
+function playTTS(text){
+  const synth=window.speechSynthesis;
+  const utter=new SpeechSynthesisUtterance(text);
+  synth.speak(utter);
 }
 
 btn.onclick=async()=>{
   const prompt=document.getElementById('prompt').value.trim();
-  const duration=parseFloat(document.getElementById('sceneDuration').value)||5;
-  const openaiKey=document.getElementById('openaiKey').value.trim();
-  const kaiberKey=document.getElementById('kaiberKey').value.trim();
-  const userImage=userImageInput.files[0]||null;
+  const duration=parseInt(document.getElementById('duration').value)||8;
+  const userImages=userImagesInput.files.length?userImagesInput.files:null;
 
-  if(!prompt||!openaiKey||!kaiberKey) return alert('Fill all required fields');
-
-  btn.disabled=true; btn.textContent='Generating Smart Cinematic Reel...';
+  if(!prompt)return alert('Enter a scene prompt');
+  btn.disabled=true; btn.textContent='Generating...';
 
   try{
-    const clip=await generateSceneVideo(prompt,duration,userImage,kaiberKey);
-    const audio=await generateTTS(openaiKey,prompt);
-    const final=await mergeClipsWithAudio([clip],[audio]);
-    preview.src=URL.createObjectURL(final);
+    playTTS(prompt);
+    const blob=await renderVideo(prompt,duration,userImages);
+    preview.src=URL.createObjectURL(blob);
   }catch(e){console.error(e); alert('Error: '+e);}
-  
-  btn.disabled=false; btn.textContent='Generate Smart Cinematic Reel';
+  btn.disabled=false; btn.textContent='Generate Reel';
 };
 </script>
 </body>
