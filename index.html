@@ -3,338 +3,152 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Reels Generator — Educational Reels</title>
+  <title>AI Reels Generator — Behavior Sequencer + SFX</title>
   <style>
-    :root{--bg:#0b1220;--card:#071129;--accent:#7ee7b8;color-scheme:dark}
-    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial}
-    body{background:linear-gradient(180deg,#041026 0%, #071024 100%);color:#e6eef6;display:flex;align-items:flex-start;justify-content:center;padding:26px}
-    .app{width:1100px;max-width:100%;display:grid;grid-template-columns:420px 1fr;gap:18px}
-    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);padding:18px;border-radius:12px;box-shadow:0 6px 24px rgba(2,6,23,0.6)}
-    h1{font-size:18px;margin:0 0 10px}
-    label{display:block;font-size:13px;margin:10px 0 6px;color:#cfe8df}
-    input[type=text], textarea, select, input[type=number] {width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px}
-    textarea{min-height:88px}
-    button{background:var(--accent);border:none;color:#042017;padding:10px 12px;border-radius:10px;font-weight:600;cursor:pointer}
-    .muted{color:#98a3b3;font-size:13px}
-    .preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-    .video-card{background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));padding:8px;border-radius:10px;display:flex;flex-direction:column;gap:8px}
-    .video-card video{width:100%;border-radius:8px;background:#000}
-    .controls{display:flex;gap:8px;align-items:center}
-    .small-muted{font-size:12px;color:#9fb4aa}
-    .option-row{display:flex;gap:8px}
-    code{background:rgba(255,255,255,0.03);padding:2px 6px;border-radius:6px}
+    body{margin:0;padding:20px;background:#0b1220;color:#e6eef6;font-family:Inter,system-ui,sans-serif;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
+    .container{max-width:1000px;width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;box-shadow:0 0 25px rgba(0,0,0,0.4)}
+    h1{margin-top:0;color:#6ee7b7;text-align:center}
+    label{display:block;margin-top:12px;font-size:14px}
+    textarea,input,select{width:100%;padding:10px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:15px}
+    button{margin-top:12px;background:#6ee7b7;color:#0b1220;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600}
+    video{width:100%;margin-top:14px;border-radius:8px;background:#000}
+    .note{font-size:13px;color:#aaa;text-align:center;margin-top:10px}
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="panel">
-      <h1>AI Reels Generator — Educational</h1>
-      <p class="muted">Enter a topic and this app will create short educational reels by generating a short script, producing a voiceover (via optional TTS API or browser TTS), rendering an animated video, and exporting a combined video file.</p>
-
-      <label for="topic">Topic (what the reel explains)</label>
-      <input id="topic" type="text" placeholder="e.g. What is Bitcoin?" value="What is blockchain in simple terms" />
-
-      <label for="length">Approx. length (seconds)</label>
-      <input id="length" type="number" min="5" max="120" value="30" />
-
-      <label for="segments">Number of caption segments</label>
-      <input id="segments" type="number" min="1" max="8" value="4" />
-
-      <label for="voiceMode">Voice mode</label>
-      <select id="voiceMode">
-        <option value="browser">Browser TTS (no key, lower quality)</option>
-        <option value="api">Remote TTS (provide API response audio; embedded in final video)</option>
-      </select>
-
-      <div id="apiBox" style="display:none;margin-top:8px">
-        <label for="apiEndpoint">TTS API Endpoint (POST returns audio file blob)</label>
-        <input id="apiEndpoint" type="text" placeholder="https://api.elevenlabs.io/v1/text-to-speech/your-voice-id" />
-        <label for="apiKey">API Key (optional header Authorization)</label>
-        <input id="apiKey" type="text" placeholder="Paste API key here (keeps private on your machine)" />
-        <div class="small-muted" style="margin-top:6px">Note: Example providers: ElevenLabs, OpenAI TTS. Endpoint must accept JSON {text: '...'} and return audio (wav/mp3/ogg).</div>
-      </div>
-
-      <label for="style">Visual style</label>
-      <select id="style">
-        <option value="clean">Clean text slides</option>
-        <option value="retro">Retro gradient</option>
-        <option value="cinematic">Cinematic</option>
-      </select>
-
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="create">Create Reel</button>
-        <button id="clear" style="background:#ff6b6b">Clear outputs</button>
-      </div>
-
-      <div style="margin-top:14px;font-size:13px;color:#9fb4aa">
-        <strong>How it works</strong>
-        <ol style="margin:8px 0 0 18px">
-          <li>Generates a short segmented script for the topic (local generator or API if you add one).</li>
-          <li>If <code>Remote TTS</code> is selected, the app will POST each segment to the TTS endpoint and receive audio blobs.</li>
-          <li>It renders each segment as an animated caption on a canvas, then records the canvas and merges the audio tracks into a single WebM file.</li>
-        </ol>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h1>Outputs</h1>
-      <div id="status" class="small-muted">No outputs yet.</div>
-      <div style="height:12px"></div>
-      <div id="gallery" class="preview-grid"></div>
-    </div>
+  <div class="container">
+    <h1>🎬 AI Reels Generator (Behavior + SFX)</h1>
+    <label>Scene Script (one action per line)</label>
+    <textarea id="script" rows="6" placeholder="e.g.\n1. Cat walks in\n2. Cat spots fish bowl\n3. Cat jumps with excitement"></textarea>
+    <label>Duration per Step (seconds)</label>
+    <input id="stepDuration" type="number" min="1" max="20" value="3" />
+    <label>OpenAI API Key (for sound effects)</label>
+    <input id="apiKey" type="text" placeholder="Paste your OpenAI API key" />
+    <button id="generate">Generate Animated Reel</button>
+    <video id="preview" controls></video>
+    <div class="note">Each line in the script becomes a timed scene with motion effects and AI-generated sound effects.</div>
   </div>
-
   <script>
-    // AI Reels Generator (educational). Local-first approach with optional remote TTS embedding.
-    const topicEl = document.getElementById('topic');
-    const lengthEl = document.getElementById('length');
-    const segmentsEl = document.getElementById('segments');
-    const styleEl = document.getElementById('style');
-    const createBtn = document.getElementById('create');
-    const clearBtn = document.getElementById('clear');
-    const gallery = document.getElementById('gallery');
-    const status = document.getElementById('status');
-    const voiceModeEl = document.getElementById('voiceMode');
-    const apiBox = document.getElementById('apiBox');
-    const apiEndpointEl = document.getElementById('apiEndpoint');
-    const apiKeyEl = document.getElementById('apiKey');
+    const btn=document.getElementById('generate');
+    const preview=document.getElementById('preview');
 
-    voiceModeEl.addEventListener('change', ()=>{
-      apiBox.style.display = voiceModeEl.value === 'api' ? 'block' : 'none';
-    });
-
-    // Simple local "script generator" — creates N short segments for the given topic.
-    function generateScriptLocal(topic, nSegments){
-      const segments = [];
-      const safeTopic = topic || 'this topic';
-      const intro = `What is ${safeTopic}? In short:`;
-      segments.push(intro);
-
-      // ensure we always produce nSegments entries (fill with fallback sentences if needed)
-      for(let i=0;i<Math.max(0, nSegments-2);i++){
-        segments.push(`Point ${i+1}: A concise explanation about ${safeTopic} in one sentence.`);
-      }
-      if(nSegments>1) segments.push(`Quick recap: ${safeTopic} is important because it helps people with practical benefits.`);
-
-      // Guarantee length and string type
-      while(segments.length < nSegments) segments.push('');
-      return segments.slice(0, nSegments).map(s => (typeof s === 'string' ? s : String(s || '')));
+    async function getBackgroundImage(prompt){
+      const query=encodeURIComponent(prompt.split(' ').slice(0,3).join(' '));
+      return `https://source.unsplash.com/1280x720/?${query}`;
     }
 
-    // Fetch TTS audio for a single text segment using a generic POST-based API.
-    async function fetchTTS(apiEndpoint, apiKey, text){
-      const headers = {'Content-Type':'application/json'};
-      if(apiKey) headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
-      const resp = await fetch(apiEndpoint, {method:'POST', headers, body:JSON.stringify({text})});
-      if(!resp.ok) throw new Error('TTS API error: '+resp.status);
-      const blob = await resp.blob();
-      return blob; // audio blob
+    function detectMotion(line){
+      line=line.toLowerCase();
+      if(line.includes('walk'))return 'panRight';
+      if(line.includes('zoom'))return 'zoomIn';
+      if(line.includes('jump'))return 'jump';
+      if(line.includes('shake'))return 'shake';
+      if(line.includes('look')||line.includes('spot'))return 'zoomOut';
+      if(line.includes('pan left'))return 'panLeft';
+      if(line.includes('pan up'))return 'panUp';
+      if(line.includes('pan down'))return 'panDown';
+      return 'none';
     }
 
-    // Safe wrapText: guards against undefined/null text and empty strings
-    function wrapText(ctx, text, x, y, maxWidth, lineHeight){
-      if (!text && text !== '') text = '';
-      // ensure it's a string
-      text = String(text || '');
-      const words = text.split(' ');
-      let line = '';
-      const lines = [];
-      for(let n=0;n<words.length;n++){
-        const testLine = line + words[n] + ' ';
-        const metrics = ctx.measureText(testLine);
-        if(metrics.width > maxWidth && n>0){ lines.push(line.trim()); line = words[n] + ' '; }
-        else { line = testLine; }
-      }
-      lines.push(line.trim());
-      // handle empty case
-      if(lines.length === 1 && lines[0] === '') return;
-      const totalH = lines.length * lineHeight;
-      let startY = y - totalH/2 + lineHeight/2;
-      for(let i=0;i<lines.length;i++){
-        ctx.fillText(lines[i], x, startY + i*lineHeight);
-      }
-    }
-
-    // Create a combined video for the whole script with provided audio blobs (array may be empty -> use browser TTS playback)
-    async function renderReel(segments, secondsTotal, style, audioBlobs){
-      const w = 1080, h = 1920; // vertical video for reels
-      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-
-      function drawFrame(t, segIndex, segProgress){
-        // defensive: clamp segIndex
-        segIndex = Math.max(0, Math.min(segments.length - 1, segIndex));
-        // background
-        if(style==='retro'){
-          const g = ctx.createLinearGradient(0,0,w,h);
-          g.addColorStop(0,'#2b0f3a'); g.addColorStop(1,'#f97316'); ctx.fillStyle = g;
-        } else if(style==='cinematic'){
-          const g = ctx.createLinearGradient(0,0,w,h); g.addColorStop(0,'#041633'); g.addColorStop(1,'#0f2740'); ctx.fillStyle = g;
-        } else { ctx.fillStyle = '#07111a'; }
-        ctx.fillRect(0,0,w,h);
-
-        // floating shapes
-        for(let i=0;i<8;i++){
-          const cx = (Math.sin(t*0.6 + i)*0.5 + 0.5) * w;
-          const cy = (Math.cos(t*0.4 + i)*0.5 + 0.5) * h;
-          const r = 40 + 120*Math.abs(Math.sin(t*0.8 + i));
-          ctx.globalAlpha = 0.04; ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-
-        // caption box - ensure text is defined
-        const rawText = segments[segIndex];
-        const text = (typeof rawText === 'string') ? rawText : (rawText == null ? '' : String(rawText));
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        const fontSize = Math.floor(w/14);
-        ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.font = `700 ${fontSize}px sans-serif`;
-        const scale = 0.95 + 0.1*Math.sin(segProgress*Math.PI);
-        ctx.save(); ctx.translate(w/2, h*0.45); ctx.scale(scale, scale);
-        wrapText(ctx, text, 0, 0, Math.floor(w*0.8), fontSize*1.15);
-        ctx.restore();
-
-        // footer
-        ctx.font = '18px monospace'; ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.fillText(`Topic: ${topicEl.value || ''}`, w/2, h - 80);
-      }
-
-      // durations
-      const segCount = Math.max(1, segments.length);
-      const segDur = secondsTotal / segCount;
-
-      // prepare audio: if audioBlobs provided, create an AudioContext destination stream
-      let audioStream = null;
-      if(audioBlobs && audioBlobs.length>0){
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const dest = audioCtx.createMediaStreamDestination();
-        for(let i=0;i<audioBlobs.length;i++){
-          const blob = audioBlobs[i];
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
-          const src = audioCtx.createMediaElementSource(audio);
-          try{ src.connect(dest); src.connect(audioCtx.destination); }catch(e){ console.warn('AudioContext connect failed', e); }
-          audio._meta = {segIndex: i}; audio.preload = 'auto'; audio._url = url; audio._blob = blob;
-          if(!canvas._audios) canvas._audios = [];
-          canvas._audios.push(audio);
-        }
-        audioStream = dest.stream;
-      }
-
-      // capture canvas stream and optionally add audio track
-      const canvasStream = canvas.captureStream(30);
-      if(audioStream){
-        const audioTracks = audioStream.getAudioTracks();
-        if(audioTracks && audioTracks.length) canvasStream.addTrack(audioTracks[0]);
-      }
-
-      // recorder
-      const options = {mimeType: 'video/webm;codecs=vp9,opus'};
-      let recorder;
-      try{ recorder = new MediaRecorder(canvasStream, options); }catch(e){ recorder = new MediaRecorder(canvasStream); }
-      const chunks = [];
-      recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
-
-      return new Promise(async (resolve, reject)=>{
-        try{
-          let currentAudioIndex = 0;
-          function playNextAudio(){
-            if(!canvas._audios || currentAudioIndex>=canvas._audios.length) return;
-            const aud = canvas._audios[currentAudioIndex];
-            aud.onended = ()=>{ currentAudioIndex++; playNextAudio(); };
-            aud.play().catch(e=>{ console.warn('Audio play failed', e); currentAudioIndex++; playNextAudio(); });
-          }
-
-          recorder.start(200);
-
-          if(canvas._audios && canvas._audios.length>0){
-            try{ await (new Promise(res=>setTimeout(res,100))); }catch(e){}
-            playNextAudio();
-          }
-
-          const start = performance.now();
-          function frame(now){
-            const t = (now - start) / 1000; // seconds elapsed
-            const segIndex = Math.min(segCount-1, Math.floor(t / segDur));
-            const segProgress = ((t - segIndex*segDur) / segDur);
-            drawFrame(t, segIndex, segProgress);
-            if(t < secondsTotal + 0.3) requestAnimationFrame(frame);
-            else {
-              setTimeout(()=>{ recorder.stop(); }, 200);
-            }
-          }
-          requestAnimationFrame(frame);
-
-          recorder.onstop = ()=>{ const blob = new Blob(chunks, {type: 'video/webm'}); resolve(blob); };
-        }catch(err){ reject(err); }
-      });
-    }
-
-    // Main flow: generate script -> optional TTS fetch -> render -> provide download
-    createBtn.addEventListener('click', async ()=>{
+    async function generateSFX(apiKey, prompt){
       try{
-        gallery.innerHTML = '';
-        status.textContent = 'Generating script...';
-        const topic = topicEl.value.trim(); if(!topic) return alert('Enter a topic');
-        const seconds = Math.max(5, Math.min(120, parseInt(lengthEl.value,10)||30));
-        const segs = Math.max(1, Math.min(8, parseInt(segmentsEl.value,10)||4));
-        const style = styleEl.value;
+        const resp = await fetch('https://api.openai.com/v1/audio/generate',{ 
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+          body:JSON.stringify({
+            model:'gpt-4o-audio-preview',
+            prompt:prompt,
+            format:'wav'
+          })
+        });
+        if(!resp.ok)throw new Error(resp.statusText);
+        const blob=await resp.blob();
+        return blob;
+      }catch(e){
+        console.warn('SFX API failed, fallback to browser beep',e);
+        // fallback: short beep
+        const ctx=new AudioContext();
+        const o=ctx.createOscillator();
+        const g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        o.frequency.value=440;o.type='sine';o.start();
+        o.stop(ctx.currentTime+0.2);
+        return null;
+      }
+    }
 
-        const segments = generateScriptLocal(topic, segs);
-        status.textContent = `Script generated (${segments.length} segments). Getting audio...`;
+    async function renderBehaviorSequence(scriptLines,stepDuration,apiKey){
+      const canvas=document.createElement('canvas');
+      canvas.width=720;canvas.height=1280;
+      const ctx=canvas.getContext('2d');
+      const fps=30;const stepFrames=fps*stepDuration;
+      const totalFrames=stepFrames*scriptLines.length;
+      const stream=canvas.captureStream(fps);
+      const rec=new MediaRecorder(stream,{mimeType:'video/webm'});
+      let chunks=[];
+      rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+      const done=new Promise(res=>rec.onstop=()=>res(new Blob(chunks,{type:'video/webm'})));
+      rec.start();
 
-        const audioBlobs = [];
-        if(voiceModeEl.value === 'api'){
-          const endpoint = apiEndpointEl.value.trim();
-          const key = apiKeyEl.value.trim();
-          if(!endpoint) return alert('Provide TTS API endpoint when using Remote TTS');
-          for(let i=0;i<segments.length;i++){
-            status.textContent = `Requesting audio ${i+1}/${segments.length}...`;
-            try{ const b = await fetchTTS(endpoint, key, segments[i] || ''); audioBlobs.push(b); }
-            catch(err){ console.error(err); alert('TTS fetch error: '+err); break; }
-          }
+      for(let i=0;i<scriptLines.length;i++){
+        const line=scriptLines[i].trim();
+        const motion=detectMotion(line);
+        const img=new Image();
+        img.crossOrigin='anonymous';
+        img.src=await getBackgroundImage(line||'scene');
+        await img.decode();
+
+        // fetch SFX for this step
+        let sfx=null;
+        if(apiKey){
+          sfx=await generateSFX(apiKey,line);
+        }
+        let audio=null;
+        if(sfx){
+          audio=new Audio(URL.createObjectURL(sfx));
+          audio.play().catch(()=>console.warn('Audio play failed'));
         }
 
-        status.textContent = 'Rendering video (this may take a few seconds)...';
-        const blob = await renderReel(segments, seconds, style, audioBlobs);
-        const url = URL.createObjectURL(blob);
-
-        const card = document.createElement('div'); card.className='video-card';
-        const video = document.createElement('video'); video.src = url; video.controls = true; video.loop = false; video.playsInline = true;
-        card.appendChild(video);
-        const row = document.createElement('div'); row.className='controls';
-        const dl = document.createElement('a'); dl.textContent='Download WebM'; dl.href = url; dl.download = 'reel_' + topic.split(' ').join('_') + '.webm'; dl.className='tiny'; dl.style.background='rgba(255,255,255,0.06)'; dl.style.borderRadius='8px'; dl.style.padding='6px 8px';
-        row.appendChild(dl);
-
-        const previewVoice = document.createElement('button'); previewVoice.textContent='Play Voice Preview'; previewVoice.className='tiny';
-        previewVoice.onclick = ()=>{
-          if(voiceModeEl.value === 'api' && gallery._lastAudioBlobs && gallery._lastAudioBlobs.length){
-            // play the first blob as a quick preview
-            const aud = new Audio(URL.createObjectURL(gallery._lastAudioBlobs[0])); aud.play().catch(e=>console.warn(e));
-          } else {
-            // Browser TTS preview
-            const synth = window.speechSynthesis;
-            let i=0;
-            function speakNext(){
-              if(i>=segments.length) return;
-              const u = new SpeechSynthesisUtterance(segments[i] || '');
-              u.rate = 1.0; u.pitch = 1.0;
-              u.onend = ()=>{ i++; speakNext(); };
-              synth.speak(u);
-            }
-            speakNext();
+        for(let f=0;f<stepFrames;f++){
+          const t=f/fps;
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          let dx=0,dy=0,scale=1;
+          switch(motion){
+            case 'zoomIn':scale=1+0.05*t;break;
+            case 'zoomOut':scale=1-0.05*t;break;
+            case 'panLeft':dx=-t*60;break;
+            case 'panRight':dx=t*60;break;
+            case 'panUp':dy=-t*60;break;
+            case 'panDown':dy=t*60;break;
+            case 'shake':dx=Math.sin(t*40)*10;dy=Math.cos(t*40)*10;break;
+            case 'jump':dy=-Math.abs(Math.sin(t*6.28)*60);break;
           }
-        };
-        row.appendChild(previewVoice);
+          const iw=img.width*scale, ih=img.height*scale;
+          const x=(canvas.width-iw)/2+dx;
+          const y=(canvas.height-ih)/2+dy;
+          ctx.drawImage(img,x,y,iw,ih);
+          ctx.font='bold 42px sans-serif';
+          ctx.fillStyle='rgba(255,255,255,0.9)';
+          ctx.textAlign='center';
+          ctx.fillText(line,canvas.width/2,canvas.height-80);
+          await new Promise(r=>setTimeout(r,1000/fps));
+        }
+      }
+      rec.stop();
+      return done;
+    }
 
-        card.appendChild(row);
-        gallery.appendChild(card);
-
-        status.textContent = 'Done — video generated.';
-        gallery._lastAudioBlobs = audioBlobs;
-
-      }catch(err){ console.error(err); alert('Error: '+err); status.textContent = 'Error.'; }
-    });
-
-    clearBtn.addEventListener('click', ()=>{gallery.innerHTML=''; status.textContent='Cleared.';});
+    btn.onclick=async()=>{
+      const script=document.getElementById('script').value.trim();
+      if(!script)return alert('Enter a scene script with multiple steps');
+      const lines=script.split(/\n+/).filter(Boolean);
+      const stepDuration=parseFloat(document.getElementById('stepDuration').value)||3;
+      const apiKey=document.getElementById('apiKey').value.trim();
+      btn.disabled=true;btn.textContent='Rendering...';
+      const blob=await renderBehaviorSequence(lines,stepDuration,apiKey);
+      preview.src=URL.createObjectURL(blob);
+      btn.disabled=false;btn.textContent='Generate Animated Reel';
+    };
   </script>
 </body>
 </html>
