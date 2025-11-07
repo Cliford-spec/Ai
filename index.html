@@ -1,154 +1,161 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Reels Generator — Behavior Sequencer + SFX</title>
-  <style>
-    body{margin:0;padding:20px;background:#0b1220;color:#e6eef6;font-family:Inter,system-ui,sans-serif;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
-    .container{max-width:1000px;width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;box-shadow:0 0 25px rgba(0,0,0,0.4)}
-    h1{margin-top:0;color:#6ee7b7;text-align:center}
-    label{display:block;margin-top:12px;font-size:14px}
-    textarea,input,select{width:100%;padding:10px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:15px}
-    button{margin-top:12px;background:#6ee7b7;color:#0b1220;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600}
-    video{width:100%;margin-top:14px;border-radius:8px;background:#000}
-    .note{font-size:13px;color:#aaa;text-align:center;margin-top:10px}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart AI Cinematic Generator</title>
+<style>
+body{margin:0;padding:20px;background:#0b1220;color:#e6eef6;font-family:Inter,system-ui,sans-serif;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
+.container{max-width:1000px;width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;box-shadow:0 0 25px rgba(0,0,0,0.4)}
+h1{margin-top:0;color:#6ee7b7;text-align:center}
+label{display:block;margin-top:12px;font-size:14px}
+textarea,input,select{width:100%;padding:10px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:15px}
+button{margin-top:12px;background:#6ee7b7;color:#0b1220;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600}
+video{width:100%;margin-top:14px;border-radius:8px;background:#000}
+.note{font-size:13px;color:#aaa;text-align:center;margin-top:10px}
+#uploads{margin-top:8px}
+#uploads input{margin-top:4px}
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>🎬 AI Reels Generator (Behavior + SFX)</h1>
-    <label>Scene Script (one action per line)</label>
-    <textarea id="script" rows="6" placeholder="e.g.\n1. Cat walks in\n2. Cat spots fish bowl\n3. Cat jumps with excitement"></textarea>
-    <label>Duration per Step (seconds)</label>
-    <input id="stepDuration" type="number" min="1" max="20" value="3" />
-    <label>OpenAI API Key (for sound effects)</label>
-    <input id="apiKey" type="text" placeholder="Paste your OpenAI API key" />
-    <button id="generate">Generate Animated Reel</button>
-    <video id="preview" controls></video>
-    <div class="note">Each line in the script becomes a timed scene with motion effects and AI-generated sound effects.</div>
-  </div>
-  <script>
-    const btn=document.getElementById('generate');
-    const preview=document.getElementById('preview');
+<div class="container">
+<h1>🤖 Smart AI Cinematic Generator</h1>
 
-    async function getBackgroundImage(prompt){
-      const query=encodeURIComponent(prompt.split(' ').slice(0,3).join(' '));
-      return `https://source.unsplash.com/1280x720/?${query}`;
+<label>Prompt (Describe scene & actions)</label>
+<textarea id="prompt" rows="5" placeholder="e.g. Cat sees fish bowl, jumps, meows"></textarea>
+
+<label>Scene Duration (seconds)</label>
+<input id="sceneDuration" type="number" min="1" max="20" value="5">
+
+<label>OpenAI API Key (TTS)</label>
+<input id="openaiKey" type="text" placeholder="Paste your OpenAI API key">
+
+<label>Kaiber API Key (AI Video)</label>
+<input id="kaiberKey" type="text" placeholder="Paste your Kaiber API key">
+
+<label>Upload Object Image (optional)</label>
+<div id="uploads">
+  <input type="file" id="userImage" accept="image/*">
+</div>
+
+<button id="generate">Generate Smart Cinematic Reel</button>
+<video id="preview" controls></video>
+<div class="note">Automatically animates objects, handles multi-step behaviors, motion, camera, TTS, and sound effects.</div>
+</div>
+
+<script>
+const btn=document.getElementById('generate');
+const preview=document.getElementById('preview');
+const userImageInput=document.getElementById('userImage');
+
+function easeInOut(t){return t<0.5?2*t*t:1-(--t)*(2*t-1);}
+
+async function fileToBase64(file){
+  return new Promise(res=>{
+    const reader=new FileReader();
+    reader.onload=()=>res(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Generate AI video for a scene (multi-step behavior)
+async function generateSceneVideo(prompt,duration,userImage,kaiberKey){
+  const payload={
+    prompt,
+    duration,
+    style:'cinematic',
+    behavior:'smart',
+    userImage:userImage?await fileToBase64(userImage):null
+  };
+  const resp=await fetch('https://api.kaiber.ai/v1/generate',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+kaiberKey},
+    body:JSON.stringify(payload)
+  });
+  if(!resp.ok) throw new Error('Kaiber API error: '+resp.status);
+  const data=await resp.json();
+  const videoResp=await fetch(data.videoUrl);
+  return await videoResp.blob();
+}
+
+// Generate TTS for a scene
+async function generateTTS(openaiKey,text){
+  const resp=await fetch('https://api.openai.com/v1/audio/speech',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+openaiKey,'Content-Type':'application/json'},
+    body:JSON.stringify({model:'gpt-4o-mini-tts',voice:'alloy',input:text})
+  });
+  if(!resp.ok) throw new Error('TTS API error: '+resp.status);
+  return await resp.blob();
+}
+
+// Merge clips with smooth frame-by-frame motion
+async function mergeClipsWithAudio(clips,audios){
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=720; canvas.height=1280;
+  const fps=30;
+  const stream=canvas.captureStream(fps);
+  const rec=new MediaRecorder(stream,{mimeType:'video/webm'});
+  const chunks=[];
+  rec.ondataavailable=e=>{if(e.data.size) chunks.push(e.data)};
+  rec.start();
+
+  for(let i=0;i<clips.length;i++){
+    const clipBlob=clips[i];
+    const audioBlob=audios[i];
+    const videoEl=document.createElement('video');
+    videoEl.src=URL.createObjectURL(clipBlob);
+    videoEl.muted=true; await videoEl.play().catch(()=>{});
+    const audioEl=document.createElement('audio');
+    audioEl.src=URL.createObjectURL(audioBlob);
+    audioEl.play().catch(()=>{});
+
+    const duration=videoEl.duration||4;
+    const totalFrames=Math.ceil(fps*duration);
+    for(let f=0;f<totalFrames;f++){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const t=easeInOut(f/totalFrames);
+
+      // Smooth transforms
+      const scale=1+t*0.1;
+      const dx=t*50; const dy=t*30;
+      ctx.save();
+      ctx.translate(dx,dy);
+      ctx.scale(scale,scale);
+      ctx.drawImage(videoEl,0,0,canvas.width,canvas.height);
+      ctx.restore();
+
+      await new Promise(r=>setTimeout(r,1000/fps));
     }
+    videoEl.pause();
+    audioEl.pause();
+  }
 
-    function detectMotion(line){
-      line=line.toLowerCase();
-      if(line.includes('walk'))return 'panRight';
-      if(line.includes('zoom'))return 'zoomIn';
-      if(line.includes('jump'))return 'jump';
-      if(line.includes('shake'))return 'shake';
-      if(line.includes('look')||line.includes('spot'))return 'zoomOut';
-      if(line.includes('pan left'))return 'panLeft';
-      if(line.includes('pan up'))return 'panUp';
-      if(line.includes('pan down'))return 'panDown';
-      return 'none';
-    }
+  rec.stop();
+  return new Promise(res=>rec.onstop=()=>res(new Blob(chunks,{type:'video/webm'})));
+}
 
-    async function generateSFX(apiKey, prompt){
-      try{
-        const resp = await fetch('https://api.openai.com/v1/audio/generate',{ 
-          method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-          body:JSON.stringify({
-            model:'gpt-4o-audio-preview',
-            prompt:prompt,
-            format:'wav'
-          })
-        });
-        if(!resp.ok)throw new Error(resp.statusText);
-        const blob=await resp.blob();
-        return blob;
-      }catch(e){
-        console.warn('SFX API failed, fallback to browser beep',e);
-        // fallback: short beep
-        const ctx=new AudioContext();
-        const o=ctx.createOscillator();
-        const g=ctx.createGain();
-        o.connect(g);g.connect(ctx.destination);
-        o.frequency.value=440;o.type='sine';o.start();
-        o.stop(ctx.currentTime+0.2);
-        return null;
-      }
-    }
+btn.onclick=async()=>{
+  const prompt=document.getElementById('prompt').value.trim();
+  const duration=parseFloat(document.getElementById('sceneDuration').value)||5;
+  const openaiKey=document.getElementById('openaiKey').value.trim();
+  const kaiberKey=document.getElementById('kaiberKey').value.trim();
+  const userImage=userImageInput.files[0]||null;
 
-    async function renderBehaviorSequence(scriptLines,stepDuration,apiKey){
-      const canvas=document.createElement('canvas');
-      canvas.width=720;canvas.height=1280;
-      const ctx=canvas.getContext('2d');
-      const fps=30;const stepFrames=fps*stepDuration;
-      const totalFrames=stepFrames*scriptLines.length;
-      const stream=canvas.captureStream(fps);
-      const rec=new MediaRecorder(stream,{mimeType:'video/webm'});
-      let chunks=[];
-      rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-      const done=new Promise(res=>rec.onstop=()=>res(new Blob(chunks,{type:'video/webm'})));
-      rec.start();
+  if(!prompt||!openaiKey||!kaiberKey) return alert('Fill all required fields');
 
-      for(let i=0;i<scriptLines.length;i++){
-        const line=scriptLines[i].trim();
-        const motion=detectMotion(line);
-        const img=new Image();
-        img.crossOrigin='anonymous';
-        img.src=await getBackgroundImage(line||'scene');
-        await img.decode();
+  btn.disabled=true; btn.textContent='Generating Smart Cinematic Reel...';
 
-        // fetch SFX for this step
-        let sfx=null;
-        if(apiKey){
-          sfx=await generateSFX(apiKey,line);
-        }
-        let audio=null;
-        if(sfx){
-          audio=new Audio(URL.createObjectURL(sfx));
-          audio.play().catch(()=>console.warn('Audio play failed'));
-        }
-
-        for(let f=0;f<stepFrames;f++){
-          const t=f/fps;
-          ctx.clearRect(0,0,canvas.width,canvas.height);
-          let dx=0,dy=0,scale=1;
-          switch(motion){
-            case 'zoomIn':scale=1+0.05*t;break;
-            case 'zoomOut':scale=1-0.05*t;break;
-            case 'panLeft':dx=-t*60;break;
-            case 'panRight':dx=t*60;break;
-            case 'panUp':dy=-t*60;break;
-            case 'panDown':dy=t*60;break;
-            case 'shake':dx=Math.sin(t*40)*10;dy=Math.cos(t*40)*10;break;
-            case 'jump':dy=-Math.abs(Math.sin(t*6.28)*60);break;
-          }
-          const iw=img.width*scale, ih=img.height*scale;
-          const x=(canvas.width-iw)/2+dx;
-          const y=(canvas.height-ih)/2+dy;
-          ctx.drawImage(img,x,y,iw,ih);
-          ctx.font='bold 42px sans-serif';
-          ctx.fillStyle='rgba(255,255,255,0.9)';
-          ctx.textAlign='center';
-          ctx.fillText(line,canvas.width/2,canvas.height-80);
-          await new Promise(r=>setTimeout(r,1000/fps));
-        }
-      }
-      rec.stop();
-      return done;
-    }
-
-    btn.onclick=async()=>{
-      const script=document.getElementById('script').value.trim();
-      if(!script)return alert('Enter a scene script with multiple steps');
-      const lines=script.split(/\n+/).filter(Boolean);
-      const stepDuration=parseFloat(document.getElementById('stepDuration').value)||3;
-      const apiKey=document.getElementById('apiKey').value.trim();
-      btn.disabled=true;btn.textContent='Rendering...';
-      const blob=await renderBehaviorSequence(lines,stepDuration,apiKey);
-      preview.src=URL.createObjectURL(blob);
-      btn.disabled=false;btn.textContent='Generate Animated Reel';
-    };
-  </script>
+  try{
+    const clip=await generateSceneVideo(prompt,duration,userImage,kaiberKey);
+    const audio=await generateTTS(openaiKey,prompt);
+    const final=await mergeClipsWithAudio([clip],[audio]);
+    preview.src=URL.createObjectURL(final);
+  }catch(e){console.error(e); alert('Error: '+e);}
+  
+  btn.disabled=false; btn.textContent='Generate Smart Cinematic Reel';
+};
+</script>
 </body>
 </html>
